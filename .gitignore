@@ -1,0 +1,10 @@
+VCTK-Corpus
+Documents
+ForgerComrade
+*.npy
+*.pkl
+*.pth
+*.png
+*.pyc
+*.wav
+login_ghc.sh
