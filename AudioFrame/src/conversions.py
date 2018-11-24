@@ -112,11 +112,11 @@ def fourier_time_series(samples, window, interval, fft_size):
     for i in range(num_intervals):
         fourier_time_slices[i] = np.fft.rfft(time_slices[i])
 
-    return fourier_time_slices / window
+    return fourier_time_slices / np.sqrt(fft_size * window)
 
 
 def inv_fourier_time_series(fourier_time_slices, window, interval, fft_size):
-    fourier_time_slices = fourier_time_slices * window
+    fourier_time_slices = fourier_time_slices * np.sqrt(fft_size * window)
 
     num_intervals = fourier_time_slices.shape[0]
     length = (num_intervals - 1) * interval + window
