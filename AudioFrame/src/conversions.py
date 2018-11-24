@@ -24,7 +24,7 @@ class AudioFrameConvOptions:
         self.window_length = 0.025
         self.interval_length = 0.005
         self.fft_size = 512
-        self.noise_thres = 5e-5
+        self.noise_thres = 0.001
 
 
 default_options = AudioFrameConvOptions()
@@ -43,11 +43,13 @@ def encode(sample_rate, samples, options=default_options):
     frames = np.abs(frames_cmp)
     phase_data = np.angle(frames_cmp)
 
-    energy = np.sqrt((frames ** 2).mean(axis=1, keepdims=True))
+    energy = (frames ** 2).sum(axis=1, keepdims=True)
+    energy = np.sqrt((energy * 2 - frames[:, 0:1] ** 2) / options.fft_size)
     frames = np.concatenate([frames, energy], axis=1)
 
-    frames = np.log(1.0 + (frames / options.noise_thres))
-    frames = frames + np.log(options.noise_thres)
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    frames = np.log(1.0 + (frames / noise_thres_f))
+    frames = frames + np.log(noise_thres_f)
 
     return frames, phase_data
 
@@ -57,8 +59,9 @@ def decode(sample_rate, frames, num_iters,
     window = round(sample_rate * options.window_length)
     interval = round(sample_rate * options.interval_length)
 
-    frames = frames[:, :-1] - np.log(options.noise_thres)
-    frames = (np.exp(frames) - 1.0) * options.noise_thres
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    frames = np.maximum(frames[:, :-1] - np.log(noise_thres_f), 0)
+    frames = (np.exp(frames) - 1.0) * noise_thres_f
 
     if phase_data is None:
         phase_data = np.random.uniform(
