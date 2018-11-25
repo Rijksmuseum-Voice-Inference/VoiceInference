@@ -1,10 +1,14 @@
 from torch.nn import *
 from .library import *
 
+LOG_EPSILON = -10
+
 
 model = Sequential(
+    AddConst(-LOG_EPSILON),
+    LearnableBias(),
     PadToMinimum(189, 2),
-    Conv1d(301, 512, 5, stride=2),  # 189 -> 93
+    Conv1d(258, 512, 5, stride=2),  # 189 -> 93
     ReLU(),
     Conv1d(512, 512, 5, stride=2),  # 93 -> 45
     ReLU(),

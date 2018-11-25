@@ -16,7 +16,7 @@ def save_wav(file_name, sample_rate, samples):
 def display_frames(frames):
     x, y = np.mgrid[:frames.shape[0], :frames.shape[1] - 1]
     plt.pcolormesh(x, y, frames[:, :-1])
-    plt.show(block=False)
+    plt.savefig('temp.png')
 
 
 class AudioFrameConvOptions:
