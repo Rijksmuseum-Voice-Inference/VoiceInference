@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import conversions
 
+SAMPLE_RATE = 16000
 VCTK_PATH = "../VCTK-Corpus/wav48/"
 
 conv_options = conversions.AudioFrameConvOptions()
@@ -32,8 +33,8 @@ for speaker in os.listdir(VCTK_PATH):
             continue
 
         utterance_path = os.path.join(speaker_path, utterance)
-        _, samples = conversions.load_wav(utterance_path)
-        frames, _ = conversions.encode(sample_rate, samples, conv_options)
+        samples = conversions.load_wav(utterance_path, SAMPLE_RATE)
+        frames, _ = conversions.encode(SAMPLE_RATE, samples, conv_options)
 
         utterances.append(utterance)
         speech.append(frames)
