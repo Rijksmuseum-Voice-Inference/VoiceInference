@@ -24,7 +24,9 @@ class AudioFrameConvOptions:
         self.window_length = 0.025
         self.interval_length = 0.005
         self.fft_size = 512
-        self.noise_thres = 0.001
+        self.noise_thres = 0.0002
+        self.typical_sig = 0.02
+        self.outlier_percentile = 99.5
 
 
 default_options = AudioFrameConvOptions()
@@ -43,15 +45,7 @@ def encode(sample_rate, samples, options=default_options):
     frames = np.abs(frames_cmp)
     phase_data = np.angle(frames_cmp)
 
-    energy = (frames ** 2).sum(axis=1, keepdims=True)
-    energy = np.sqrt((energy * 2 - frames[:, 0:1] ** 2) / options.fft_size)
-    frames = np.concatenate([frames, energy], axis=1)
-
-    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
-    frames = np.log(1.0 + (frames / noise_thres_f))
-    frames = frames + np.log(noise_thres_f)
-
-    return frames, phase_data
+    return to_log(frames, options), phase_data
 
 
 def decode(sample_rate, frames, num_iters,
@@ -59,9 +53,7 @@ def decode(sample_rate, frames, num_iters,
     window = round(sample_rate * options.window_length)
     interval = round(sample_rate * options.interval_length)
 
-    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
-    frames = np.maximum(frames[:, :-1] - np.log(noise_thres_f), 0)
-    frames = (np.exp(frames) - 1.0) * noise_thres_f
+    frames = from_log(frames, options)
 
     if phase_data is None:
         phase_data = np.random.uniform(
@@ -82,6 +74,50 @@ def decode(sample_rate, frames, num_iters,
 
     return inv_fourier_time_series(
         frames_iter, window, interval, options.fft_size)
+
+
+def to_log(mag_frames, options):
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+
+    return (np.log(1.0 + mag_frames / noise_thres_f) +
+            np.log(noise_thres_f) - np.log(typical_sig_f))
+
+
+def to_band_log(mag_frames, options):
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+
+    band_mags = np.percentile(mag_frames, 90, axis=0, keepdims=True)
+    band_logs_pos = np.log(1.0 + band_mags / noise_thres_f)
+    log_frames_pos = mag_frames / band_mags * band_logs_pos
+
+    outlier_mag = np.percentile(log_frames_pos, options.outlier_percentile)
+    log_frames_pos[log_frames_pos > outlier_mag] = outlier_mag
+
+    return (log_frames_pos + np.log(noise_thres_f) - np.log(typical_sig_f))
+
+
+def from_log(log_frames, options):
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+
+    log_frames_pos = np.maximum(
+        log_frames + np.log(typical_sig_f) - np.log(noise_thres_f), 0.0)
+
+    return (np.exp(log_frames_pos) - 1.0) * noise_thres_f
+
+
+def from_band_log(log_frames, options):
+    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
+    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+
+    log_frames_pos = np.maximum(
+        log_frames + np.log(typical_sig_f) - np.log(noise_thres_f), 0.0)
+    band_logs_pos = np.percentile(log_frames_pos, 90, axis=0, keepdims=True)
+    band_mags = (np.exp(band_logs_pos) - 1.0) * noise_thres_f
+
+    return log_frames_pos / band_logs_pos * band_mags
 
 
 def expand_to_fit(length, window, interval):
