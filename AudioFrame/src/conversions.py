@@ -14,8 +14,9 @@ def save_wav(file_name, sample_rate, samples):
 
 
 def display_frames(frames):
-    x, y = np.mgrid[:frames.shape[0], :frames.shape[1] - 1]
-    plt.pcolormesh(x, y, frames[:, :-1])
+    x, y = np.mgrid[:frames.shape[0], :frames.shape[1]]
+    plt.clf()
+    plt.pcolormesh(x, y, frames)
     plt.savefig('temp.png')
 
 
@@ -26,7 +27,8 @@ class AudioFrameConvOptions:
         self.fft_size = 512
         self.noise_thres = 0.0002
         self.typical_sig = 0.02
-        self.outlier_percentile = 99.5
+        self.signal_percentile = 95
+        self.outlier_percentile = 99.9
 
 
 default_options = AudioFrameConvOptions()
@@ -45,15 +47,13 @@ def encode(sample_rate, samples, options=default_options):
     frames = np.abs(frames_cmp)
     phase_data = np.angle(frames_cmp)
 
-    return to_log(frames, options), phase_data
+    return frames, phase_data
 
 
 def decode(sample_rate, frames, num_iters,
            options=default_options, phase_data=None):
     window = round(sample_rate * options.window_length)
     interval = round(sample_rate * options.interval_length)
-
-    frames = from_log(frames, options)
 
     if phase_data is None:
         phase_data = np.random.uniform(
@@ -76,7 +76,7 @@ def decode(sample_rate, frames, num_iters,
         frames_iter, window, interval, options.fft_size)
 
 
-def to_log(mag_frames, options):
+def to_log(mag_frames, options=default_options):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
@@ -84,11 +84,12 @@ def to_log(mag_frames, options):
             np.log(noise_thres_f) - np.log(typical_sig_f))
 
 
-def to_band_log(mag_frames, options):
+def to_band_log(mag_frames, options=default_options):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
-    band_mags = np.percentile(mag_frames, 90, axis=0, keepdims=True)
+    band_mags = np.percentile(
+        mag_frames, options.signal_percentile, axis=0, keepdims=True)
     band_logs_pos = np.log(1.0 + band_mags / noise_thres_f)
     log_frames_pos = mag_frames / band_mags * band_logs_pos
 
@@ -98,7 +99,7 @@ def to_band_log(mag_frames, options):
     return (log_frames_pos + np.log(noise_thres_f) - np.log(typical_sig_f))
 
 
-def from_log(log_frames, options):
+def from_log(log_frames, options=default_options):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
@@ -108,13 +109,14 @@ def from_log(log_frames, options):
     return (np.exp(log_frames_pos) - 1.0) * noise_thres_f
 
 
-def from_band_log(log_frames, options):
+def from_band_log(log_frames, options=default_options):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
     log_frames_pos = np.maximum(
         log_frames + np.log(typical_sig_f) - np.log(noise_thres_f), 0.0)
-    band_logs_pos = np.percentile(log_frames_pos, 90, axis=0, keepdims=True)
+    band_logs_pos = np.percentile(
+        log_frames_pos, options.signal_percentile, axis=0, keepdims=True)
     band_mags = (np.exp(band_logs_pos) - 1.0) * noise_thres_f
 
     return log_frames_pos / band_logs_pos * band_mags
@@ -139,12 +141,21 @@ def get_window_indices(num_intervals, window, interval):
         interval_offsets[:, np.newaxis]
 
 
+def get_window_fn(window):
+    window_fn = np.cos(2 * np.pi * np.arange(window) / window)
+    window_fn = 25 / 46 - 21 / 46 * window_fn
+    return window_fn[np.newaxis, :]
+
+
 def fourier_time_series(samples, window, interval, fft_size):
     num_intervals = get_num_intervals(samples.shape[0], window, interval)
     window_indices = get_window_indices(num_intervals, window, interval)
 
+    time_slices = samples[window_indices]
+    time_slices = time_slices * get_window_fn(window)
     time_slices = np.pad(
-        samples[window_indices], [(0, 0), (0, fft_size - window)], 'constant')
+        time_slices, [(0, 0), (0, fft_size - window)], 'constant')
+
     fourier_time_slices = np.zeros(
         (num_intervals, fft_size // 2 + 1), dtype='c8')
 
@@ -168,6 +179,8 @@ def inv_fourier_time_series(fourier_time_slices, window, interval, fft_size):
     for i in range(num_intervals):
         time_slices[i] = np.fft.irfft(
             fourier_time_slices[i], fft_size)[:window]
+
+    time_slices = time_slices / get_window_fn(window)
 
     window_weight_profile = np.concatenate([
         np.linspace(0, 1, interval),
