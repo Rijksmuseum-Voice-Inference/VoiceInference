@@ -25,7 +25,7 @@ class AudioFrameConvOptions:
         self.window_length = 0.025
         self.interval_length = 0.005
         self.fft_size = 512
-        self.noise_thres = 0.0002
+        self.noise_thres = 0.002
         self.typical_sig = 0.02
         self.signal_percentile = 95
         self.outlier_percentile = 99.9
@@ -145,6 +145,10 @@ def get_window_fn(window):
     window_fn = np.cos(2 * np.pi * np.arange(window) / window)
     window_fn = 25 / 46 - 21 / 46 * window_fn
     return window_fn[np.newaxis, :]
+
+
+def get_window_power():
+    return 1691 / 4232
 
 
 def fourier_time_series(samples, window, interval, fft_size):
