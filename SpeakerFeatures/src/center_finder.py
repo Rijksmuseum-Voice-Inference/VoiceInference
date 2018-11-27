@@ -30,6 +30,7 @@ discriminator.load_state_dict(torch.load(DISCRIMINATOR_SNAPSHOT_PATH))
 discriminator.eval()
 if example_tensor.is_cuda:
     discriminator = discriminator.cuda()
+sigmoid = torch.nn.Sigmoid()
 
 result = torch.zeros(NUM_SPEAKERS, ENCODED_DIM)
 total_cluster_score = 0.0
@@ -73,8 +74,8 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
     result[speaker] = center[0]
 
     cluster_score = ((encoded - center) ** 2).mean().item()
-    discrim_score = discriminator(torch.cat([
-        encoded, center.repeat(num_utterances, 1)], dim=1)).mean().item()
+    discrim_score = sigmoid(discriminator(torch.cat([
+        encoded, center.repeat(num_utterances, 1)], dim=1))).mean().item()
     print("(%0.3f|%0.3f)" % (cluster_score, discrim_score),
           end=' ', flush=True)
     total_cluster_score += cluster_score

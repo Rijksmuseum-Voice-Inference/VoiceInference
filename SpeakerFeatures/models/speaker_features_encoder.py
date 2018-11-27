@@ -1,14 +1,12 @@
 from torch.nn import *
 from .library import *
+import numpy as np
 
-LOG_EPSILON = -10
-
+BACKGROUND = np.log(0.01)
 
 model = Sequential(
-    AddConst(-LOG_EPSILON),
-    LearnableBias(),
-    PadToMinimum(189, 2),
-    Conv1d(258, 512, 5, stride=2),  # 189 -> 93
+    PadToMinimum(189, 2, value=BACKGROUND),
+    Conv1d(257, 512, 5, stride=2),  # 189 -> 93
     ReLU(),
     Conv1d(512, 512, 5, stride=2),  # 93 -> 45
     ReLU(),

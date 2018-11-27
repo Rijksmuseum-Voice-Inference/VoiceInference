@@ -1,5 +1,8 @@
 from torch.nn import *
 from .library import *
+import numpy as np
+
+BACKGROUND = np.log(0.01)
 
 
 class SpeakerTransferDiscriminator(Module):
@@ -7,8 +10,8 @@ class SpeakerTransferDiscriminator(Module):
         super().__init__()
 
         self.layers = Sequential(
-            PadToMinimum(45, 2),
-            Conv1d(301 + 128, 256, 5),  # 45 -> 41
+            PadToMinimum(45, 2, value=BACKGROUND),
+            Conv1d(257 + 128, 256, 5),  # 45 -> 41
             LeakyReLU(negative_slope=0.1),
             Conv1d(256, 256, 5),  # 41 -> 37
             LeakyReLU(negative_slope=0.1),
@@ -22,7 +25,6 @@ class SpeakerTransferDiscriminator(Module):
             LeakyReLU(negative_slope=0.1),
             Conv1d(1024, 1024, 5),  # 5 -> 1
             GlobalAvgPool(),
-            Sigmoid()
         )
 
     def forward(self, features, categ):

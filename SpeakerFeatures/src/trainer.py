@@ -18,7 +18,7 @@ class Parameters:
         self.header = "speaker_features"
         self.speaker_take_count = 15
         self.utterance_take_count = 20
-        self.lr = 0.00005
+        self.lr = 0.0001
         self.batch_size = 64
         self.average_count = 100
         self.cluster_term = 0.05
@@ -47,7 +47,7 @@ def train(params):
         torch.nn.Sequential(encoder, discriminator).parameters(),
         lr=params.lr)
     mse = torch.nn.MSELoss()
-    bce = torch.nn.BCELoss()
+    bce = torch.nn.BCEWithLogitsLoss()
 
     speaker_averages = {}
     average_decay = 1.0 - 1.0 / params.average_count

@@ -6,7 +6,7 @@ class Discriminator(torch.nn.Module):
         super().__init__()
         self.net = net
         self.forward = self.discriminate
-        self.bce = torch.nn.BCELoss()
+        self.bce = torch.nn.BCEWithLogitsLoss()
 
     def discriminate(self, features, categ):
         return self.net(features, categ)

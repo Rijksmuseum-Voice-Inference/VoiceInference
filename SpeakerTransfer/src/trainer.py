@@ -29,10 +29,10 @@ class Parameters:
         self.speaker_categs_path = "../SpeakerFeatures/data/centers.pth"
         self.stage = ""
         self.header = "speaker_transfer"
-        self.lr = 0.00004
+        self.lr = 0.00005
         self.advers_lr = 0.00002
-        self.categ_term = 0.02
-        self.advers_term = 0.01
+        self.categ_term = 0.1
+        self.advers_term = 0.05
         self.batch_size = 32
         self.num_periods = 0
         self.period_size = 10000

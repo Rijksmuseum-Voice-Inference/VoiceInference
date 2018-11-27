@@ -3,6 +3,33 @@ from torch.nn import *
 import torch.nn.functional as F
 
 
+class MultConst(Module):
+    def __init__(self, multiplier):
+        super().__init__()
+        self.multiplier = multiplier
+
+    def forward(self, features):
+        return features * self.multiplier
+
+
+class AddConst(Module):
+    def __init__(self, addend):
+        super().__init__()
+        self.addend = addend
+
+    def forward(self, features):
+        return features + self.addend
+
+
+class LearnableBias(Module):
+    def __init__(self):
+        super().__init__()
+        self.bias = Parameter(torch.zeros(1))
+
+    def forward(self, features):
+        return features + self.bias
+
+
 class Dropout1d(Module):
     def __init__(self, *args, **kwargs):
         super().__init__()

@@ -2,6 +2,7 @@ from torch.nn import *
 from .library import *
 
 EPSILON = 1e-6
+LOG_EPSILON = -10
 
 
 class SpeakerTransferReconstructor(Module):
@@ -30,25 +31,14 @@ class SpeakerTransferReconstructor(Module):
             RevertSize(self.sizes, transform={1: 512}),
             Conv1d(512, 512, 5, padding=2),
             LeakyReLU(negative_slope=0.1),
-            Conv1d(512, 301, 5, padding=2),
-            ReLU()
+            Conv1d(512, 257, 5, padding=2),
         )
 
     def forward(self, features, metadata):
-        (sizes, energy) = metadata
+        (sizes,) = metadata
         self.sizes.clear()
         self.sizes += sizes
-        result = self.layers(features)[:, :-1, :]
-
-        energy_raw = torch.exp(energy) - 1.0
-        result_raw = torch.exp(result) - 1.0
-        result_energy_raw = torch.sqrt(
-            (result_raw ** 2).mean(dim=1, keepdim=True))
-        result_energy_raw = torch.clamp(result_energy_raw, min=EPSILON)
-        result_raw = torch.cat([
-            result_raw / result_energy_raw * energy_raw,
-            energy_raw], dim=1)
-        return torch.log(1.0 + result_raw)
+        return self.layers(features)
 
 
 model = SpeakerTransferReconstructor()

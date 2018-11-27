@@ -9,5 +9,4 @@ model = Sequential(
     Linear(64, 64),
     ReLU(),
     Linear(64, 1),
-    Sigmoid()
 )

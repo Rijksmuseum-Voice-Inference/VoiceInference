@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 import conversions
 
-NUM_PROCESSES = 4
+NUM_PROCESSES = 8
 SAMPLE_RATE = 16000
 VCTK_PATH = "../VCTK-Corpus/wav48/"
 
