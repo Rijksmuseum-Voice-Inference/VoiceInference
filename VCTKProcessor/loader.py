@@ -1,16 +1,40 @@
 import os
+import pickle
 import threading
 import numpy as np
 import torch
 import torch.utils.data
+import conversions
 
 
 class VCTKLoader:
-    def __init__(self, data_path, example_tensor,
+    def __init__(self, data_path, example_tensor, features,
                  num_speakers=100, speaker_start_index=0,
                  speaker_take_count=40, utterance_take_count=40):
         self.data_path = data_path
         self.example_tensor = example_tensor
+
+        with open(os.path.join(data_path, 'conv_options.pkl'), 'rb') as f:
+            self.conv_options = pickle.load(f)
+
+        if features == 'mag':
+            self.feature_extractor = lambda mag_frames: mag_frames
+        elif features == 'log':
+            self.feature_extractor = lambda mag_frames: \
+                torch.tensor(conversions.to_log(
+                    mag_frames.numpy(), self.conv_options))
+        elif features == 'mag_norm':
+            band_mags = np.load(os.path.join(data_path, 'band_mags.npy'))
+            self.feature_extractor = lambda mag_frames: \
+                torch.tensor(conversions.to_mag_norm(
+                    mag_frames.numpy(), band_mags, self.conv_options))
+        elif features == 'two':
+            band_mags = np.load(os.path.join(data_path, 'band_mags.npy'))
+            self.feature_extractor = lambda mag_frames: \
+                torch.tensor(conversions.to_two(
+                    mag_frames.numpy(), band_mags, self.conv_options))
+        else:
+            raise RuntimeError("Invalid feature type: " + features) 
 
         self.num_speakers = num_speakers
         self.speaker_start_index = speaker_start_index
@@ -39,7 +63,8 @@ class VCTKLoader:
                 start_index = indices[utterance].item()
                 end_index = indices[utterance + 1].item()
 
-                result = torch.t(speech[start_index:end_index])
+                result = self.feature_extractor(speech[start_index:end_index])
+                result = torch.t(result)
                 result = result.reshape([1, *result.size()])
                 result = self.example_tensor.new_tensor(result)
 

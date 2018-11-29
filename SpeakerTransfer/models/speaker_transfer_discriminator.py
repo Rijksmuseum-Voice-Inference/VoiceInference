@@ -2,15 +2,14 @@ from torch.nn import *
 from .library import *
 import numpy as np
 
-BACKGROUND = np.log(0.01)
-
 
 class SpeakerTransferDiscriminator(Module):
     def __init__(self):
         super().__init__()
 
         self.layers = Sequential(
-            PadToMinimum(45, 2, value=BACKGROUND),
+            PadToMinimum(45, 2),
+            LearnableBias(),
             Conv1d(257 + 128, 256, 5),  # 45 -> 41
             LeakyReLU(negative_slope=0.1),
             Conv1d(256, 256, 5),  # 41 -> 37

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pdb
+import IPython
 import random
 import numpy as np
 import torch
@@ -29,9 +29,9 @@ class Parameters:
         self.speaker_categs_path = "../SpeakerFeatures/data/centers.pth"
         self.stage = ""
         self.header = "speaker_transfer"
-        self.lr = 0.00005
+        self.lr = 0.00004
         self.advers_lr = 0.00002
-        self.categ_term = 0.1
+        self.categ_term = 0.10
         self.advers_term = 0.05
         self.batch_size = 32
         self.num_periods = 0
@@ -74,7 +74,7 @@ def train_analysts(params):
         discriminator.parameters(),
         lr=params.advers_lr)
 
-    data_loader = VCTKLoader(params.data_path, example_tensor)
+    data_loader = VCTKLoader(params.data_path, example_tensor, features='log')
     data_iterator = iter(data_loader)
 
     categ_loss_sum_batch = 0.0
@@ -204,7 +204,7 @@ def pretrain_manipulators(params):
 
     optim = torch.optim.Adam(latent_forger.parameters(), lr=params.lr)
 
-    data_loader = VCTKLoader(params.data_path, example_tensor)
+    data_loader = VCTKLoader(params.data_path, example_tensor, features='log')
     data_iterator = iter(data_loader)
 
     latent_loss_sum_batch = 0.0
@@ -319,7 +319,7 @@ def train_manipulators(params):
         discriminator.parameters(),
         lr=params.advers_lr)
 
-    data_loader = VCTKLoader(params.data_path, example_tensor)
+    data_loader = VCTKLoader(params.data_path, example_tensor, features='log')
     data_iterator = iter(data_loader)
 
     forgery_categ_loss_sum_batch = 0.0
@@ -460,13 +460,7 @@ def playground(params):
     latent_forger = LatentForger(latent_forger_model)
     latent_forger.load_state_dict(torch.load(
         'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth'))
-    latent_forger.train()
-
-    if example_tensor.is_cuda:
-        speaker_categs = speaker_categs.cuda()
-        describer = describer.cuda()
-        reconstructor = reconstructor.cuda()
-        latent_forger = latent_forger.cuda()
+    latent_forger.eval()
 
     try:
         describer.load_state_dict(torch.load(
@@ -479,7 +473,7 @@ def playground(params):
         print("Couldn't load all snapshots!")
         pass
 
-    pdb.set_trace()
+    IPython.embed()
 
 
 def main():

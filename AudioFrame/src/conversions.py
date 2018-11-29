@@ -17,7 +17,7 @@ def display_frames(frames):
     x, y = np.mgrid[:frames.shape[0], :frames.shape[1]]
     plt.clf()
     plt.pcolormesh(x, y, frames)
-    plt.savefig('temp.png')
+    plt.savefig('temp.png', dpi=800)
 
 
 class AudioFrameConvOptions:
@@ -27,7 +27,6 @@ class AudioFrameConvOptions:
         self.fft_size = 512
         self.noise_thres = 0.002
         self.typical_sig = 0.02
-        self.signal_percentile = 95
         self.outlier_percentile = 99.9
 
 
@@ -84,19 +83,23 @@ def to_log(mag_frames, options=default_options):
             np.log(noise_thres_f) - np.log(typical_sig_f))
 
 
-def to_band_log(mag_frames, options=default_options):
-    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
-    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+def to_mag_norm(mag_frames, band_mags, options=default_options):
+    target_mag = np.log(band_mags)
+    target_mag = target_mag - target_mag.min() + 1
+    target_mag = target_mag / target_mag.max()
 
-    band_mags = np.percentile(
-        mag_frames, options.signal_percentile, axis=0, keepdims=True)
-    band_logs_pos = np.log(1.0 + band_mags / noise_thres_f)
-    log_frames_pos = mag_frames / band_mags * band_logs_pos
+    norm_frames = mag_frames / band_mags * target_mag
 
-    outlier_mag = np.percentile(log_frames_pos, options.outlier_percentile)
-    log_frames_pos[log_frames_pos > outlier_mag] = outlier_mag
+    outlier_mag = np.percentile(norm_frames, options.outlier_percentile)
+    norm_frames[norm_frames > outlier_mag] = outlier_mag
 
-    return (log_frames_pos + np.log(noise_thres_f) - np.log(typical_sig_f))
+    return norm_frames
+
+
+def to_two(mag_frames, band_mags, options=default_options):
+    return np.concatenate(
+        [to_log(mag_frames, options),
+         to_mag_norm(mag_frames, band_mags)], axis=1)
 
 
 def from_log(log_frames, options=default_options):
@@ -109,17 +112,18 @@ def from_log(log_frames, options=default_options):
     return (np.exp(log_frames_pos) - 1.0) * noise_thres_f
 
 
-def from_band_log(log_frames, options=default_options):
-    noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
-    typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
+def from_mag_norm(norm_frames, band_mags, options=default_options):
+    target_mag = np.log(band_mags)
+    target_mag = target_mag - target_mag.min() + 1
+    target_mag = target_mag / target_mag.max()
 
-    log_frames_pos = np.maximum(
-        log_frames + np.log(typical_sig_f) - np.log(noise_thres_f), 0.0)
-    band_logs_pos = np.percentile(
-        log_frames_pos, options.signal_percentile, axis=0, keepdims=True)
-    band_mags = (np.exp(band_logs_pos) - 1.0) * noise_thres_f
+    return np.maximum(norm_frames, 0) / target_mag * band_mags
 
-    return log_frames_pos / band_logs_pos * band_mags
+
+def from_two(two_frames, band_mags, options=default_options):
+    count = two_frames.shape[1] // 2
+    norm_frames = two_frames[:, count:]
+    return from_mag_norm(norm_frames, band_mags, options)
 
 
 def expand_to_fit(length, window, interval):

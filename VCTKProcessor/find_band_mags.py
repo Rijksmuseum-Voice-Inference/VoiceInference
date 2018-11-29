@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pickle
 import numpy as np
 import conversions
@@ -11,8 +13,8 @@ with open("data/conv_options.pkl", 'rb') as f:
 
 window_power = conversions.get_window_power()
 
-sum_band_mags = np.zeros((1, conv_options.fft_size // 2 + 1))
-count_band_mags = np.zeros((1, conv_options.fft_size // 2 + 1))
+sum_band_log_mags = np.zeros((1, conv_options.fft_size // 2 + 1))
+count_band_mags = 0
 
 for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
     path = "data/speech_" + str(speaker) + ".npy"
@@ -29,15 +31,18 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
         end_index = indices[utterance + 1]
 
         value = speech[start_index:end_index]
+        value[value <= 0.0] = 1.0
+
         energy = (value ** 2).sum(axis=1, keepdims=True)
         energy = energy * 2 - (value[:, 0:1] ** 2)
         energy = energy / window_power
-        activation_mask = (np.sqrt(energy) > conv_options.noise_thres)
+        activation_mask = (np.sqrt(energy) > conv_options.typical_sig)
 
-        sum_band_mags += np.sum(value * activation_mask, axis=0, keepdims=True)
-        count_band_mags += np.sum(activation_mask, axis=0, keepdims=True)
+        sum_band_log_mags += np.sum(
+            np.log(value) * activation_mask, axis=0, keepdims=True)
+        count_band_mags += np.sum(activation_mask)
 
 count_band_mags = np.maximum(count_band_mags, 1)
-band_mags = sum_band_mags / count_band_mags
+band_mags = np.exp(sum_band_log_mags / count_band_mags)
 
-np.save('data/band_mags.npy')
+np.save('data/band_mags.npy', band_mags)

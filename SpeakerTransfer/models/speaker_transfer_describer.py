@@ -2,8 +2,6 @@ from torch.nn import *
 from .library import *
 import numpy as np
 
-BACKGROUND = np.log(0.01)
-
 
 class PartialAvgPool(Module):
     def __init__(self, num_average):
@@ -25,7 +23,8 @@ class SpeakerTransferDescriber(Module):
         self.sizes = []
         self.layers = Sequential(
             AppendSize(self.sizes),
-            PadToMinimum(93, 2, value=BACKGROUND),
+            PadToMinimum(93, 2),
+            LearnableBias(),
             Conv1d(257, 512, 5, padding=2),
             LeakyReLU(negative_slope=0.1),
             Conv1d(512, 512, 5, padding=2),
@@ -47,7 +46,7 @@ class SpeakerTransferDescriber(Module):
             LeakyReLU(negative_slope=0.1),
             Conv1d(1536, 1536, 1),  # 1 -> 1
             LeakyReLU(negative_slope=0.1),
-            Conv1d(1536, 512 + 128, 1),  # 1 -> 1
+            Conv1d(1536, 1024 + 128, 1),  # 1 -> 1
             PartialAvgPool(128)
         )
 

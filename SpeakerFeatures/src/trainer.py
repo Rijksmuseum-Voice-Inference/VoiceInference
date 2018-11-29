@@ -18,7 +18,7 @@ class Parameters:
         self.header = "speaker_features"
         self.speaker_take_count = 15
         self.utterance_take_count = 20
-        self.lr = 0.0001
+        self.lr = 0.00002
         self.batch_size = 64
         self.average_count = 100
         self.cluster_term = 0.05
@@ -52,7 +52,7 @@ def train(params):
     speaker_averages = {}
     average_decay = 1.0 - 1.0 / params.average_count
     data_loader = loader.VCTKLoader(
-        params.data_path, example_tensor,
+        params.data_path, example_tensor, features='log',
         speaker_take_count=params.speaker_take_count,
         utterance_take_count=params.utterance_take_count)
 

@@ -8,7 +8,7 @@ class LatentForgerModel(Module):
         super().__init__()
 
         self.layers = Sequential(
-            Conv1d(512 + 2 * 128, 1024, 3, padding=1),
+            Conv1d(1024 + 2 * 128, 1024, 3, padding=1),
             LeakyReLU(negative_slope=0.1),
             Conv1d(1024, 1024, 3, padding=1),
             LeakyReLU(negative_slope=0.1),
@@ -16,12 +16,12 @@ class LatentForgerModel(Module):
             LeakyReLU(negative_slope=0.1),
             Conv1d(1536, 1024, 3, padding=1),
             LeakyReLU(negative_slope=0.1),
-            Conv1d(1024, 512, 3, padding=1)
+            Conv1d(1024, 1024, 3, padding=1)
         )
 
     def forward(self, forgery_latent, forgery_categ, orig_categ):
         batch_size = forgery_latent.size()[0]
-        forgery_latent = forgery_latent.reshape(batch_size, 512, -1)
+        forgery_latent = forgery_latent.reshape(batch_size, 1024, -1)
         _, _, width = forgery_latent.size()
 
         layer_input = torch.cat([

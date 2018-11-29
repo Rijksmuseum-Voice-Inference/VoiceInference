@@ -2,7 +2,7 @@ from torch.nn import *
 from .library import *
 import numpy as np
 
-BACKGROUND = np.log(0.01)
+BACKGROUND = np.log(0.1)
 
 model = Sequential(
     PadToMinimum(189, 2, value=BACKGROUND),

@@ -31,7 +31,6 @@ def task(file_id, speaker_path, utterances):
         utterance_path = os.path.join(speaker_path, utterance)
         samples = conversions.load_wav(utterance_path, SAMPLE_RATE)
         frames, _ = conversions.encode(SAMPLE_RATE, samples, conv_options)
-        frames = conversions.to_band_log(frames, conv_options)
 
         speech.append(frames.astype(np.float32))
         sizes.append(frames.shape[0])

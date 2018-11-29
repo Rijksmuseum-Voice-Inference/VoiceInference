@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import torch
 import util
+import conversions
 
 NUM_SPEAKERS = 100
 SPEAKER_START_INDEX = 0
@@ -13,6 +14,10 @@ DISCRIMINATOR_NAME = "speaker_features_discriminator"
 DISCRIMINATOR_SNAPSHOT_PATH = "snapshots/speaker_features_discriminator.pth"
 DATA_PATH = "../VCTKProcessor/data/"
 CENTERS_PATH = "data/centers.pth"
+
+
+with open(os.path.join(DATA_PATH, "conv_options.pkl"), 'rb') as f:
+    conv_options = pickle.load(f)
 
 example_tensor = torch.tensor(0.0)
 if torch.cuda.is_available():
@@ -53,7 +58,9 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
         start_index = indices[utterance]
         end_index = indices[utterance + 1]
 
-        value = torch.tensor(speech[start_index:end_index].T)
+        value = conversions.to_log(
+            speech[start_index:end_index], conv_options)
+        value = torch.tensor(value.T)
         value = value.reshape([1, *value.size()])
         value = example_tensor.new_tensor(value)
 
