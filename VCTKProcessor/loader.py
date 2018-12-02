@@ -2,9 +2,15 @@ import os
 import pickle
 import threading
 import numpy as np
-import torch
-import torch.utils.data
 import conversions
+
+
+def from_torch(frames):
+    return frames.detach().cpu().numpy()[0].T
+
+
+def to_torch(frames, example_tensor):
+    return example_tensor.new_tensor(frames.T[np.newaxis, :, :])
 
 
 class VCTKLoader:
@@ -17,24 +23,25 @@ class VCTKLoader:
         with open(os.path.join(data_path, 'conv_options.pkl'), 'rb') as f:
             self.conv_options = pickle.load(f)
 
-        if features == 'mag':
-            self.feature_extractor = lambda mag_frames: mag_frames
+        if features == 'direct':
+            self.feature_extractor = lambda mag_frames: \
+                to_torch(mag_frames, example_tensor)
         elif features == 'log':
             self.feature_extractor = lambda mag_frames: \
-                torch.tensor(conversions.to_log(
-                    mag_frames.numpy(), self.conv_options))
+                to_torch(conversions.to_log(
+                    mag_frames, self.conv_options), example_tensor)
         elif features == 'mag_norm':
             band_mags = np.load(os.path.join(data_path, 'band_mags.npy'))
             self.feature_extractor = lambda mag_frames: \
-                torch.tensor(conversions.to_mag_norm(
-                    mag_frames.numpy(), band_mags, self.conv_options))
+                to_torch(conversions.to_mag_norm(
+                    mag_frames, band_mags, self.conv_options), example_tensor)
         elif features == 'two':
             band_mags = np.load(os.path.join(data_path, 'band_mags.npy'))
             self.feature_extractor = lambda mag_frames: \
-                torch.tensor(conversions.to_two(
-                    mag_frames.numpy(), band_mags, self.conv_options))
+                to_torch(conversions.to_two(
+                    mag_frames, band_mags, self.conv_options), example_tensor)
         else:
-            raise RuntimeError("Invalid feature type: " + features) 
+            raise RuntimeError("Invalid feature type: " + features)
 
         self.num_speakers = num_speakers
         self.speaker_start_index = speaker_start_index
@@ -42,10 +49,10 @@ class VCTKLoader:
         self.utterance_take_count = utterance_take_count
 
     def __iter__(self):
-        speech = torch.zeros(0, 0)
-        indices = torch.zeros(0)
-        speakers = torch.zeros(0)
-        order = torch.zeros(0)
+        speech = np.zeros((0, 0))
+        indices = np.zeros(0)
+        speakers = np.zeros(0)
+        order = np.zeros(0)
 
         speech_next = None
         indices_next = None
@@ -59,16 +66,12 @@ class VCTKLoader:
             nonlocal order
 
             for utterance in order:
-                utterance = utterance.item()
-                start_index = indices[utterance].item()
-                end_index = indices[utterance + 1].item()
+                start_index = indices[utterance]
+                end_index = indices[utterance + 1]
 
                 result = self.feature_extractor(speech[start_index:end_index])
-                result = torch.t(result)
-                result = result.reshape([1, *result.size()])
-                result = self.example_tensor.new_tensor(result)
 
-                yield (result, speakers[utterance].item())
+                yield (result, speakers[utterance])
 
         def load_data():
             nonlocal speech_next
@@ -77,7 +80,7 @@ class VCTKLoader:
             nonlocal order_next
 
             speech_list = []
-            sizes_list = [torch.zeros(1, dtype=torch.int64)]
+            sizes_list = [np.zeros(1, dtype=np.int64)]
             speaker_list = []
             speaker_sample = np.random.choice(
                 self.num_speakers,
@@ -103,22 +106,18 @@ class VCTKLoader:
                     speech = speech[start_frames:end_frames]
                     sizes = sizes[start:end]
 
-                speech = torch.tensor(speech)
-                sizes = torch.tensor(sizes, dtype=torch.int64)
-
                 speech_list.append(speech)
-                sizes_list.append(sizes)
-                speaker_list.append(torch.zeros(
-                    sizes.size()[0], dtype=torch.int64) + speaker)
+                sizes_list.append(sizes.astype(np.int64))
+                speaker_list.append(np.zeros(
+                    sizes.shape[0], dtype=np.int64) + speaker)
 
-            speech_next = torch.cat(speech_list, dim=0)
-            indices_next = torch.cumsum(torch.cat(sizes_list), dim=0)
-            speakers_next = torch.cat(speaker_list)
+            speech_next = np.concatenate(speech_list, axis=0)
+            indices_next = np.cumsum(np.concatenate(sizes_list), axis=0)
+            speakers_next = np.concatenate(speaker_list)
             del(speech_list)
 
-            num_utterances = indices_next.size()[0] - 1
-            order_next = torch.arange(num_utterances)[
-                torch.randperm(num_utterances)]
+            num_utterances = indices_next.shape[0] - 1
+            order_next = np.random.permutation(num_utterances)
 
         while True:
             thread = threading.Thread(target=load_data)

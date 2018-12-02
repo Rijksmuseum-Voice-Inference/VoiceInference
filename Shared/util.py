@@ -1,5 +1,6 @@
 import sys
 import argparse
+import copy
 import torch
 import torch.nn
 import importlib
@@ -96,7 +97,7 @@ def torch_randint_fn(high):
 # Loads a Pytorch model from a file name inside the models folder
 def load_model(model_name):
     module = importlib.import_module("models." + model_name)
-    return module.model
+    return copy.deepcopy(module.model)
 
 
 # Performs Xavier initialization on a model

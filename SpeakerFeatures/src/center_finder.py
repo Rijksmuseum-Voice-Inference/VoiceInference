@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import util
 import conversions
+from loader import to_torch
 
 NUM_SPEAKERS = 100
 SPEAKER_START_INDEX = 0
@@ -58,11 +59,8 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
         start_index = indices[utterance]
         end_index = indices[utterance + 1]
 
-        value = conversions.to_log(
-            speech[start_index:end_index], conv_options)
-        value = torch.tensor(value.T)
-        value = value.reshape([1, *value.size()])
-        value = example_tensor.new_tensor(value)
+        value = to_torch(conversions.to_log(
+            speech[start_index:end_index], conv_options), example_tensor)
 
         encoded[utterance] = encoder(value)[0].detach()
 
