@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 import sys, math
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from numpy.matlib import repmat
+import ipdb
 
 VAD_THRESHOLD = -9.
 
@@ -46,8 +46,8 @@ def parse_data():
     target_dict = dict(zip(uniqueID_list, range(class_n)))
     label_list = [target_dict[ID_key] for ID_key in ID_list]
 
-    print '#mbkfile  #label  #frame(min) #frame(max)'
-    print len(mbkfile_list), '   ', len(list(set(label_list))) 
+    print('#mbkfile  #label  #frame(min) #frame(max)')
+    print(len(mbkfile_list), '   ', len(list(set(label_list))))
     return mbkfile_list, label_list, st_index, end_index, class_n
 
 
@@ -98,7 +98,7 @@ class ResNet(nn.Module):
             nn.Conv2d(channel_4, self.featureD, 3, 2, bias=False),
         )
         self.bn = nn.BatchNorm1d(self.featureD, affine=False)
-        self.fc1 = nn.utils.weight_norm(nn.Linear(self.featureD, class_n, bias=False), name='weight')
+        self.fc1 = nn.Linear(self.featureD, class_n, bias=False)
         
     def apply_vad(self,x):
       
@@ -110,27 +110,33 @@ class ResNet(nn.Module):
         # print x_inp.shape #(B, 1, T, F)  (5L, 1L, 16383L, 258L)
         means = torch.mean(x, dim=3)
         xMap = means > VAD_THRESHOLD # (B, T) (5L, 16383L)
-        M = Variable(torch.zeros((batch_size, time_dim, time_dim))).cuda()
+        M = torch.zeros((batch_size, time_dim, time_dim)).cuda()
              
         for i in range(batch_size):
             xMap_ins = xMap[i].view(-1,)
             x_axis = xMap_ins.nonzero().view(-1,)
             curr_shape = x_axis.shape[0]
             y_axis = torch.Tensor(range(curr_shape)).cuda().view(-1,)
-            M_ins = Variable(torch.zeros(time_dim, curr_shape)).cuda()
+            M_ins = torch.zeros(time_dim, curr_shape).cuda()
             M_ins[x_axis.data.long(), y_axis.long()] = 1
             M_ins = M_ins[:,:curr_shape]
             M_ins = M_ins.repeat(1,int(math.ceil(time_dim/float(curr_shape))))[:,:time_dim]
             M[i] = M_ins
 
-        x = torch.transpose(torch.bmm(torch.transpose(x.squeeze(),1,2), M), 1,2).unsqueeze(1)
+        x = x.squeeze()
+        if x.dim() < 3:
+            x = x.unsqueeze(0)
+        x = torch.transpose(torch.bmm(torch.transpose(x,1,2), M), 1,2).unsqueeze(1)
         return x
 
     def forward(self, x):
+        if x.size()[3] < 63:
+            x = torch.nn.functional.pad(
+                x, (0, 63 - x.size()[3], 0, 0), 'replicate')
         x = self.apply_vad(x)
         conv_o = self.convlayers(x)
         x = F.avg_pool2d(conv_o, [conv_o.size()[2], conv_o.size()[3]], stride=1)
         x = x.view(-1, self.featureD)
         x = self.bn(x)
-        return x, F.log_softmax(self.fc1(x))
+        return x, F.log_softmax(self.fc1(x), dim=1)
 

@@ -1,14 +1,16 @@
+import os
 import numpy as np
 import torch
 from torch import nn
+import IPython
 
-fbank = np.loadtxt('mel-fbank.txt')
+fbank = np.loadtxt(os.path.join(os.path.dirname(__file__), 'mel-fbank.txt'))
 fbank = torch.from_numpy(fbank).float().cuda()
 C = 4.41941738242e-05
 
-def preprocess(S, ctx_len):    
+def preprocess(S, ctx_len):
     feats = torch.exp(S.squeeze(0)) - C    
-    feats = torch.mm(feats, fbank.transpose(0,1))
+    feats = torch.mm(feats.transpose(0, 1), fbank.transpose(0,1))
     feats = torch.log(feats)
     feats -= torch.mean(feats, 0)    
 

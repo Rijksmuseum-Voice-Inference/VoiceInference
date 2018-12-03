@@ -1,3 +1,5 @@
+import os
+import IPython
 import sys
 import argparse
 import copy
@@ -95,8 +97,13 @@ def torch_randint_fn(high):
 
 
 # Loads a Pytorch model from a file name inside the models folder
-def load_model(model_name):
-    module = importlib.import_module("models." + model_name)
+def load_model(model_name, parent_folder="", direct_path=False):
+    if parent_folder != "":
+        sys.path.append(os.path.abspath(parent_folder))
+    header = "" if direct_path else "models."
+    module = importlib.import_module(header + model_name)
+    if parent_folder != "":
+        sys.path = sys.path[:-1]
     return copy.deepcopy(module.model)
 
 

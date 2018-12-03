@@ -1,6 +1,7 @@
 import numpy as np
 import librosa
 from matplotlib import pyplot as plt
+import torch
 
 EPSILON = 1e-8
 
@@ -81,6 +82,40 @@ def to_log(mag_frames, options=default_options):
 
     return (np.log(1.0 + mag_frames / noise_thres_f) +
             np.log(noise_thres_f) - np.log(typical_sig_f))
+
+
+def to_backward_compatible(log_frames):
+    noise_thres_f = np.sqrt(
+        (default_options.noise_thres ** 2) / default_options.fft_size)
+    typical_sig_f = np.sqrt(
+        (default_options.typical_sig ** 2) / default_options.fft_size)
+
+    log_frames_pos = log_frames + np.log(typical_sig_f) - np.log(noise_thres_f)
+    mag_frames = torch.clamp(
+        (torch.exp(log_frames_pos) - 1.0) * noise_thres_f, min=0.0)
+
+    C = 4.41941738242e-05
+    return torch.log(C + mag_frames / np.sqrt(get_window_power()))
+
+
+def to_backward_compatible_with_energy(log_frames):
+    noise_thres_f = np.sqrt(
+        (default_options.noise_thres ** 2) / default_options.fft_size)
+    typical_sig_f = np.sqrt(
+        (default_options.typical_sig ** 2) / default_options.fft_size)
+
+    log_frames_pos = log_frames + np.log(typical_sig_f) - np.log(noise_thres_f)
+    mag_frames = torch.clamp(
+        (torch.exp(log_frames_pos) - 1.0) * noise_thres_f, min=0.0)
+
+    energy = (mag_frames ** 2).sum(dim=1, keepdim=True)
+    energy = torch.sqrt(
+        (energy * 2 - mag_frames[:, 0:1, :] ** 2) / default_options.fft_size)
+
+    mag_frames = torch.cat([mag_frames, energy], dim=1)
+
+    C = 4.41941738242e-05
+    return torch.log(C + mag_frames / np.sqrt(get_window_power()))
 
 
 def to_mag_norm(mag_frames, band_mags, options=default_options):
