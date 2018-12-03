@@ -134,19 +134,3 @@ class ResNet(nn.Module):
         x = self.bn(x)
         return x, F.log_softmax(self.fc1(x))
 
-
-model_file = 'model.pt'
-mbkfile_list, label_list, st_index, end_index, class_n = parse_data()
-batchsize = 4
-trainset = MelBankDataset(mbkfile_list, label_list, st_index, end_index)
-dataloader = DataLoader(trainset, batch_size=batchsize, shuffle=False, num_workers=1, drop_last=False)
-
-model = ResNet(1, 4, 16, 64, 256, class_n)
-net = nn.DataParallel(model, device_ids=[0]).cuda()
-net.load_state_dict(torch.load(model_file))
-net.eval()
-
-for i, (data, target) in enumerate(dataloader):
-    data, target_label = Variable(data.cuda()), Variable(target.cuda())
-    feature, pred = net(data)
-    print feature
