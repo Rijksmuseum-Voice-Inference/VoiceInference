@@ -44,7 +44,7 @@ class Parameters:
         self.advers_term = 0.05
         self.phoneme_term = 0.02
         self.speaker_id_term = 0.02
-        self.batch_size = 32
+        self.batch_size = 24
         self.num_periods = 0
         self.period_size = 10000
         self.rand_seed = -1

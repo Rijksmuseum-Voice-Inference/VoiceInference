@@ -1,9 +1,12 @@
+import os
 import numpy as np
 import librosa
 from matplotlib import pyplot as plt
 import torch
 
 EPSILON = 1e-8
+mel_fbank = np.load(
+    os.path.join(os.path.dirname(__file__), 'mel-fbank80.npy')).T
 
 
 def load_wav(file_name, sample_rate=None):
@@ -135,6 +138,15 @@ def to_two(mag_frames, band_mags, options=default_options):
     return np.concatenate(
         [to_log(mag_frames, options),
          to_mag_norm(mag_frames, band_mags)], axis=1)
+
+
+def to_mel(mag_frames):
+    feats = mag_frames.dot(mel_fbank)
+    feats = np.log(np.maximum(feats, 1e-14))
+    feats = feats - feats.min()
+    feats = feats / feats.max() * 0.999
+
+    return feats
 
 
 def from_log(log_frames, options=default_options):
