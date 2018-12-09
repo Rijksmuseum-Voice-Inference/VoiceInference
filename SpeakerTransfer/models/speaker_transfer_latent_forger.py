@@ -1,6 +1,6 @@
 import torch
 from torch.nn import *
-from .library import *
+from library import *
 
 
 class LatentForgerModel(Module):

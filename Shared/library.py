@@ -88,6 +88,36 @@ class RevertSize(Module):
         return result
 
 
+class Slice(Module):
+    def __init__(self, size, dim):
+        super().__init__()
+        self.size = size
+        self.dim = dim
+
+    def forward(self, features):
+        return features.narrow(self.dim, 0, self.size)
+
+
+class Transpose(Module):
+    def __init__(self, dim_0, dim_1):
+        super().__init__()
+        self.dim_0 = dim_0
+        self.dim_1 = dim_1
+
+    def forward(self, features):
+        return torch.transpose(features, self.dim_0, self.dim_1)
+
+
+class TupleSelector(Module):
+    def __init__(self, module, index):
+        super().__init__()
+        self.module = module
+        self.index = index
+
+    def forward(self, features):
+        return self.module(features)[self.index]
+
+
 class PadToMinimum(Module):
     def __init__(self, minimum_size, dim, value=0):
         super().__init__()

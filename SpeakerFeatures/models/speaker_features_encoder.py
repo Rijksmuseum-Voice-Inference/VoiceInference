@@ -1,11 +1,8 @@
 from torch.nn import *
-from .library import *
-import numpy as np
-
-BACKGROUND = np.log(0.1)
+from library import *
 
 model = Sequential(
-    PadToMinimum(189, 2, value=BACKGROUND),
+    PadToMinimum(189, 2),
     Conv1d(257, 512, 5, stride=2),  # 189 -> 93
     ReLU(),
     Conv1d(512, 512, 5, stride=2),  # 93 -> 45

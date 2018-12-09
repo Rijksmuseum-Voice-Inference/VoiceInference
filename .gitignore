@@ -4,7 +4,9 @@ ForgerComrade
 *.npy
 *.pkl
 *.pth
+*.pt
 *.png
 *.pyc
 *.wav
 login_ghc.sh
+login_burro.sh

@@ -1,6 +1,5 @@
 from torch.nn import *
-from .library import *
-import numpy as np
+from library import *
 
 
 class PartialAvgPool(Module):

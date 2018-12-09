@@ -1,5 +1,5 @@
 from torch.nn import *
-from .library import *
+from library import *
 
 model = Sequential(
     Linear(256, 128),
