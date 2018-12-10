@@ -26,8 +26,7 @@ class SpeakerTransferReconstructor(Module):
             ConvTranspose1d(512, 512, 5, stride=2),
             LeakyReLU(negative_slope=0.1),
             RevertSize(self.sizes, transform={1: 512}),
-            ReplicationPad1d(1),
-            Conv1d(512, 257, 3),
+            Conv1d(512, 257, 3, padding=1),
             LearnableBias(),
         )
 
