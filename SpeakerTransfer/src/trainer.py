@@ -20,7 +20,10 @@ DISCRIMINATOR_FOOTER = "_discriminator"
 
 example_tensor = torch.tensor(0.0)
 if torch.cuda.is_available():
-    example_tensor = example_tensor.cuda()
+    try:
+        example_tensor = example_tensor.cuda()
+    except RuntimeError:
+        pass
 
 
 class Parameters:
@@ -30,11 +33,13 @@ class Parameters:
         self.band_mags_path = "../VCTKProcessor/data/band_mags.npy"
         self.stage = ""
         self.header = "speaker_transfer"
-        self.lr = 0.00004
-        self.advers_lr = 0.00002
+        self.lr = 0.0001
+        self.advers_lr = 0.00005
         self.categ_term = 0.10
+        self.robustness_term = 0.20
+        self.exp_frac = 0.5
         self.advers_term = 0.05
-        self.batch_size = 32
+        self.batch_size = 24
         self.num_periods = 0
         self.period_size = 10000
         self.rand_seed = -1
@@ -53,7 +58,7 @@ def train_analysts(params):
     describer.train()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, torch.exp)
+    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     util.initialize(reconstructor)
     reconstructor.train()
 
@@ -121,7 +126,7 @@ def train_analysts(params):
 
             loss = (
                 params.categ_term * categ_loss +
-                robustness_loss +
+                params.robustness_term * robustness_loss +
                 reconst_loss +
                 params.advers_term * gen_loss)
             discrim_loss = advers_loss
@@ -198,7 +203,7 @@ def pretrain_manipulators(params):
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, torch.exp)
+    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
     reconstructor.eval()
@@ -302,7 +307,7 @@ def train_manipulators(params):
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, torch.exp)
+    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
     reconstructor.eval()
@@ -463,7 +468,7 @@ def playground(params):
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, torch.exp)
+    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     reconstructor.eval()
 
     latent_forger_model = util.load_model(params.header + LATENT_FORGER_FOOTER)
@@ -472,11 +477,14 @@ def playground(params):
 
     try:
         describer.load_state_dict(torch.load(
-            'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth'))
+            'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth',
+            map_location=lambda storage, loc: storage))
         reconstructor.load_state_dict(torch.load(
-            'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
+            'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth',
+            map_location=lambda storage, loc: storage))
         latent_forger.load_state_dict(torch.load(
-            'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth'))
+            'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth',
+            map_location=lambda storage, loc: storage))
     except Exception:
         print("Couldn't load all snapshots!")
         pass

@@ -119,20 +119,20 @@ class TupleSelector(Module):
 
 
 class PadToMinimum(Module):
-    def __init__(self, minimum_size, dim, value=0):
+    def __init__(self, minimum_size, dim):
         super().__init__()
         self.minimum_size = minimum_size
         self.dim = dim
-        self.value = value
 
     def forward(self, features):
         orig_size = features.size()[self.dim]
         if orig_size < self.minimum_size:
-            target_size = list(features.size())
-            target_size[self.dim] = self.minimum_size - orig_size
-            features = torch.cat([
-                features, features.new_zeros(*target_size) + self.value],
-                dim=self.dim)
+            padding_size = [1] * features.dim()
+            padding_size[self.dim] = self.minimum_size - orig_size
+            last_index = features.new_tensor(orig_size - 1, dtype=torch.long)
+            padding_value = features.index_select(self.dim, last_index)
+            padding = padding_value.repeat(*padding_size)
+            features = torch.cat([features, padding], dim=self.dim)
         return features
 
 

@@ -16,16 +16,19 @@ class SpeakerTransferReconstructor(Module):
             ConvTranspose1d(1024, 512, 5, stride=2),
             LeakyReLU(negative_slope=0.1),
             RevertSize(self.sizes),
+            Transpose(1, 2),
+            TupleSelector(GRU(
+                512, 256, 2, bidirectional=True, batch_first=True), 0),
+            Transpose(1, 2),
             ConvTranspose1d(512, 512, 5, stride=2),
             LeakyReLU(negative_slope=0.1),
             RevertSize(self.sizes),
             ConvTranspose1d(512, 512, 5, stride=2),
             LeakyReLU(negative_slope=0.1),
             RevertSize(self.sizes, transform={1: 512}),
-            Transpose(1, 2),
-            TupleSelector(GRU(512, 512, 3, batch_first=True), 0),
-            Transpose(1, 2),
-            Slice(257, 1),
+            ReplicationPad1d(1),
+            Conv1d(512, 257, 3),
+            LearnableBias(),
         )
 
     def forward(self, features, metadata):
