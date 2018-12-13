@@ -39,6 +39,7 @@ class Parameters:
         self.robustness_term = 0.20
         self.exp_frac = 0.5
         self.advers_term = 0.05
+        self.activity_term = 0.05
         self.batch_size = 24
         self.num_periods = 0
         self.period_size = 10000
@@ -60,7 +61,6 @@ def train_analysts(params):
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
     reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     util.initialize(reconstructor)
-    reconstructor.train()
 
     discriminator_model = util.load_model(params.header + DISCRIMINATOR_FOOTER)
     discriminator = Discriminator(discriminator_model)
@@ -206,12 +206,10 @@ def pretrain_manipulators(params):
     reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
-    reconstructor.eval()
 
     latent_forger_model = util.load_model(params.header + LATENT_FORGER_FOOTER)
     latent_forger = LatentForger(latent_forger_model)
     util.initialize(latent_forger)
-    latent_forger.train()
 
     if example_tensor.is_cuda:
         speaker_categs = speaker_categs.cuda()
@@ -310,7 +308,6 @@ def train_manipulators(params):
     reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
-    reconstructor.eval()
 
     latent_forger_model = util.load_model(params.header + LATENT_FORGER_FOOTER)
     latent_forger = LatentForger(latent_forger_model)
@@ -342,6 +339,7 @@ def train_manipulators(params):
     data_iterator = iter(data_loader)
 
     forgery_categ_loss_sum_batch = 0.0
+    activity_loss_sum_batch = 0.0
     pretend_latent_loss_sum_batch = 0.0
     pretend_reconst_loss_sum_batch = 0.0
     gen_loss_batch = 0.0
@@ -377,6 +375,9 @@ def train_manipulators(params):
             (forgery_latent, metadata, pred_forgery_categ) = \
                 describer.describe(forgery)
 
+            activity_orig = torch.exp(orig).mean(dim=1)
+            activity_forgery = torch.exp(forgery).mean(dim=1)
+
             pretend_latent = latent_forger.modify_latent(
                 forgery_latent, forgery_categ, orig_categ)
             pretend_reconst = reconstructor.reconst(pretend_latent, metadata)
@@ -392,17 +393,21 @@ def train_manipulators(params):
                 pretend_latent, orig_latent)
             pretend_reconst_loss = reconstructor.reconst_loss(
                 pretend_reconst, orig)
+            activity_loss = ((activity_orig - activity_forgery) ** 2).mean(
+                dim=list(range(activity_orig.dim())))
             gen_loss = discriminator.gen_loss(fake_decision)
             advers_loss = discriminator.advers_loss(
                 real_decision, fake_decision)
 
             loss = (params.categ_term * forgery_categ_loss +
+                    params.activity_term * activity_loss +
                     pretend_latent_loss +
                     pretend_reconst_loss +
                     params.advers_term * gen_loss)
             discrim_loss = advers_loss
 
             forgery_categ_loss_sum_batch += forgery_categ_loss.item()
+            activity_loss_sum_batch += activity_loss.item()
             pretend_latent_loss_sum_batch += pretend_latent_loss.item()
             pretend_reconst_loss_sum_batch += pretend_reconst_loss.item()
             gen_loss_batch += gen_loss.item()
@@ -425,6 +430,7 @@ def train_manipulators(params):
 
                 print("(" + "|".join([
                     "%0.3f" % (forgery_categ_loss_sum_batch / num_in_batch),
+                    "%0.3f" % (activity_loss_sum_batch / num_in_batch),
                     "%0.3f" % (pretend_latent_loss_sum_batch / num_in_batch),
                     "%0.3f" % (pretend_reconst_loss_sum_batch / num_in_batch),
                     "%0.3f" % (gen_loss_batch / num_in_batch),
@@ -432,6 +438,7 @@ def train_manipulators(params):
                 ]) + ")", end=' ', flush=True)
 
                 forgery_categ_loss_sum_batch = 0.0
+                activity_loss_sum_batch = 0.0
                 pretend_latent_loss_sum_batch = 0.0
                 pretend_reconst_loss_sum_batch = 0.0
                 gen_loss_batch = 0.0
@@ -469,11 +476,9 @@ def playground(params):
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
     reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
-    reconstructor.eval()
 
     latent_forger_model = util.load_model(params.header + LATENT_FORGER_FOOTER)
     latent_forger = LatentForger(latent_forger_model)
-    latent_forger.eval()
 
     try:
         describer.load_state_dict(torch.load(
