@@ -65,8 +65,8 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
         orig = to_torch(conversions.to_log(
             speech[start_index:end_index], conv_options), example_tensor)
 
-        reconst = from_torch(reconstructor.reconst(
-            *describer.latent(orig)))
+        reconst = conversions.from_log(
+            from_torch(reconstructor.reconst(*describer.latent(orig))))
 
         speech_list.append(reconst)
 

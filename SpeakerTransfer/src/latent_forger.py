@@ -7,9 +7,12 @@ class LatentForger(torch.nn.Module):
         self.net = net
         self.forward = self.modify_latent
 
-    def modify_latent(self, forgery_latent, forgery_categ, orig_categ):
-        return self.net(
-            forgery_latent, forgery_categ, orig_categ)
+    def modify_latent_plus(self, orig_latent, orig_categ, forgery_categ):
+        return self.net(orig_latent, orig_categ, forgery_categ)
+
+    def modify_latent(self, orig_latent, orig_categ, forgery_categ):
+        return self.modify_latent_plus(
+            orig_latent, orig_categ, forgery_categ)[0]
 
     def pretrain_loss(self, pretend_latent, orig_latent):
         total = ((pretend_latent - orig_latent) ** 2).sum()

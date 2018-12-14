@@ -18,21 +18,20 @@ class LatentForgerModel(Module):
             Transpose(1, 2),
             Conv1d(1024, 1024, 1),
             LeakyReLU(negative_slope=0.1),
-            Conv1d(1024, 1024, 1),
+            Conv1d(1024, 1024 + 1 + 128, 1),
+            PartialAvgPool(1, 128)
         )
 
-    def forward(self, forgery_latent, forgery_categ, orig_categ):
-        batch_size = forgery_latent.size()[0]
-        forgery_latent = forgery_latent.reshape(batch_size, 1024, -1)
-        _, _, width = forgery_latent.size()
+    def forward(self, orig_latent, orig_categ, forgery_categ):
+        _, _, width = orig_latent.size()
 
         layer_input = torch.cat([
-            forgery_latent,
+            orig_latent,
             orig_categ.unsqueeze(dim=2).expand(-1, -1, width),
             forgery_categ.unsqueeze(dim=2).expand(-1, -1, width)
         ], dim=1)
 
-        return self.layers(layer_input).reshape(batch_size, -1)
+        return self.layers(layer_input)
 
 
 model = LatentForgerModel()

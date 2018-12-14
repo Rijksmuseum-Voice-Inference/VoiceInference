@@ -157,6 +157,25 @@ class UndoGlobalAvgPool(Module):
             1, 1, *sizes[2:])
 
 
+class PartialAvgPool(Module):
+    def __init__(self, *num_average):
+        super().__init__()
+        self.num_average = num_average
+        self.total_count = sum(self.num_average)
+        self.avg_pool = GlobalAvgPool()
+
+    def forward(self, features):
+        batch_size, channel_size = features.size()[0:2]
+        results = []
+        pos = channel_size - self.total_count
+
+        for count in self.num_average:
+            results.append(self.avg_pool(features[:, pos:(pos + count)]))
+            pos += count
+
+        return (features[:, :-self.total_count], *results)
+
+
 class PrintSize(Module):
     def forward(self, features):
         print(features.size())

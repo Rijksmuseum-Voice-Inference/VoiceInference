@@ -16,6 +16,7 @@ from loader import VCTKLoader
 DESCRIBER_FOOTER = "_describer"
 RECONSTRUCTOR_FOOTER = "_reconstructor"
 LATENT_FORGER_FOOTER = "_latent_forger"
+LATENT_UNDOER_FOOTER = "_latent_undoer"
 DISCRIMINATOR_FOOTER = "_discriminator"
 
 example_tensor = torch.tensor(0.0)
@@ -40,6 +41,7 @@ class Parameters:
         self.exp_frac = 0.5
         self.advers_term = 0.05
         self.activity_term = 0.05
+        self.undone_term = 0.05
         self.batch_size = 24
         self.num_periods = 0
         self.period_size = 10000
@@ -315,6 +317,9 @@ def train_manipulators(params):
         'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth'))
     latent_forger.train()
 
+    latent_undoer = util.load_model(params.header + LATENT_UNDOER_FOOTER)
+    latent_undoer.train()
+
     discriminator_model = util.load_model(params.header + DISCRIMINATOR_FOOTER)
     discriminator = Discriminator(discriminator_model)
     util.initialize(discriminator)
@@ -325,6 +330,7 @@ def train_manipulators(params):
         describer = describer.cuda()
         reconstructor = reconstructor.cuda()
         latent_forger = latent_forger.cuda()
+        latent_undoer = latent_undoer.cuda()
         discriminator = discriminator.cuda()
 
     optim = torch.optim.Adam(
@@ -340,6 +346,7 @@ def train_manipulators(params):
 
     forgery_categ_loss_sum_batch = 0.0
     activity_loss_sum_batch = 0.0
+    undone_loss_sum_batch = 0.0
     pretend_latent_loss_sum_batch = 0.0
     pretend_reconst_loss_sum_batch = 0.0
     gen_loss_batch = 0.0
@@ -369,14 +376,18 @@ def train_manipulators(params):
             orig_latent = orig_latent.detach()
             orig_reconst = reconstructor.reconst(orig_latent, metadata)
             orig_reconst = orig_reconst.detach()
-            forgery_latent_raw = latent_forger.modify_latent(
-                orig_latent, orig_categ, forgery_categ)
+            forgery_latent_raw, activity_tweak, undo_command = \
+                latent_forger.modify_latent_plus(
+                    orig_latent, orig_categ, forgery_categ)
             forgery = reconstructor.reconst(forgery_latent_raw, metadata)
             (forgery_latent, metadata, pred_forgery_categ) = \
                 describer.describe(forgery)
 
             activity_orig = torch.exp(orig).mean(dim=1)
             activity_forgery = torch.exp(forgery).mean(dim=1)
+
+            undone_latent = latent_undoer(forgery_latent, undo_command)
+            undone_reconst = reconstructor.reconst(undone_latent, metadata)
 
             pretend_latent = latent_forger.modify_latent(
                 forgery_latent, forgery_categ, orig_categ)
@@ -389,18 +400,21 @@ def train_manipulators(params):
 
             forgery_categ_loss = describer.categ_loss(
                 pred_forgery_categ, forgery_categ)
+            activity_loss = ((activity_orig - activity_forgery) ** 2).mean(
+                dim=list(range(activity_orig.dim())))
+            undone_loss = reconstructor.reconst_loss(
+                undone_reconst, orig)
             pretend_latent_loss = describer.latent_loss(
                 pretend_latent, orig_latent)
             pretend_reconst_loss = reconstructor.reconst_loss(
                 pretend_reconst, orig)
-            activity_loss = ((activity_orig - activity_forgery) ** 2).mean(
-                dim=list(range(activity_orig.dim())))
             gen_loss = discriminator.gen_loss(fake_decision)
             advers_loss = discriminator.advers_loss(
                 real_decision, fake_decision)
 
             loss = (params.categ_term * forgery_categ_loss +
                     params.activity_term * activity_loss +
+                    params.undone_term * undone_loss +
                     pretend_latent_loss +
                     pretend_reconst_loss +
                     params.advers_term * gen_loss)
@@ -408,6 +422,7 @@ def train_manipulators(params):
 
             forgery_categ_loss_sum_batch += forgery_categ_loss.item()
             activity_loss_sum_batch += activity_loss.item()
+            undone_loss_sum_batch += undone_loss.item()
             pretend_latent_loss_sum_batch += pretend_latent_loss.item()
             pretend_reconst_loss_sum_batch += pretend_reconst_loss.item()
             gen_loss_batch += gen_loss.item()
@@ -431,6 +446,7 @@ def train_manipulators(params):
                 print("(" + "|".join([
                     "%0.3f" % (forgery_categ_loss_sum_batch / num_in_batch),
                     "%0.3f" % (activity_loss_sum_batch / num_in_batch),
+                    "%0.3f" % (undone_loss_sum_batch / num_in_batch),
                     "%0.3f" % (pretend_latent_loss_sum_batch / num_in_batch),
                     "%0.3f" % (pretend_reconst_loss_sum_batch / num_in_batch),
                     "%0.3f" % (gen_loss_batch / num_in_batch),
@@ -439,6 +455,7 @@ def train_manipulators(params):
 
                 forgery_categ_loss_sum_batch = 0.0
                 activity_loss_sum_batch = 0.0
+                undone_loss_sum_batch = 0.0
                 pretend_latent_loss_sum_batch = 0.0
                 pretend_reconst_loss_sum_batch = 0.0
                 gen_loss_batch = 0.0

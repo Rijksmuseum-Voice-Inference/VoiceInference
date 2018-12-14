@@ -9,10 +9,7 @@ class Describer(torch.nn.Module):
         self.forward = self.describe
 
     def describe(self, values):
-        descr, sizes = self.net(values)
-        descr_size = descr.size()[1]
-        (latent, categ) = torch.split(
-            descr, [descr_size - self.num_categ, self.num_categ], dim=1)
+        (latent, categ), sizes = self.net(values)
         return (latent, sizes, categ)
 
     def latent(self, values):

@@ -2,20 +2,6 @@ from torch.nn import *
 from library import *
 
 
-class PartialAvgPool(Module):
-    def __init__(self, num_average):
-        super().__init__()
-        self.num_average = num_average
-        self.avg_pool = GlobalAvgPool()
-
-    def forward(self, features):
-        batch_size = features.size()[0]
-        to_average = features[:, -self.num_average:]
-        return torch.cat([
-            features[:, :-self.num_average].reshape([batch_size, -1]),
-            self.avg_pool(to_average)], dim=1)
-
-
 class SpeakerTransferDescriber(Module):
     def __init__(self):
         super().__init__()

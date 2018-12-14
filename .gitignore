@@ -10,4 +10,5 @@ ForgerComrade
 *.wav
 login_ghc.sh
 login_burro.sh
+login_tianhe.sh
 injection.txt

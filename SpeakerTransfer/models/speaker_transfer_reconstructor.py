@@ -7,7 +7,6 @@ class SpeakerTransferReconstructor(Module):
         super().__init__()
         self.sizes = []
         self.layers = Sequential(
-            Reshape(1024, -1),
             ConvTranspose1d(1024, 1536, 3),
             LeakyReLU(negative_slope=0.1),
             ConvTranspose1d(1536, 1024, 5, stride=2),
