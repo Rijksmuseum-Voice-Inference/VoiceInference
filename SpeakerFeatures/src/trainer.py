@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+
+from __future__ import print_function
+from util import print
+
 import random
 import numpy as np
 import torch

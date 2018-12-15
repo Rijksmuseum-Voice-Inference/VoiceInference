@@ -4,7 +4,7 @@ from library import *
 
 class SpeakerTransferDescriber(Module):
     def __init__(self):
-        super().__init__()
+        super(SpeakerTransferDescriber, self).__init__()
         self.sizes = []
         self.layers = Sequential(
             AppendSize(self.sizes),
@@ -36,7 +36,7 @@ class SpeakerTransferDescriber(Module):
         )
 
     def forward(self, features):
-        self.sizes.clear()
+        self.sizes *= 0
         result = self.layers(features)
         return (result, (self.sizes,))
 

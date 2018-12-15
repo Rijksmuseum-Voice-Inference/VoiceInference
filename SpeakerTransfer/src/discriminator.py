@@ -3,7 +3,7 @@ import torch
 
 class Discriminator(torch.nn.Module):
     def __init__(self, net):
-        super().__init__()
+        super(Discriminator, self).__init__()
         self.net = net
         self.forward = self.discriminate
         self.bce = torch.nn.BCEWithLogitsLoss()

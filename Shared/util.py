@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import argparse
 import copy
@@ -18,6 +20,18 @@ FRAME_RATE = 60
 COMMENT_HEADER = "//"
 
 sys.path.append(".")
+
+if sys.version_info[:2] < (3, 3):
+    old_print = print
+
+    def print(*args, **kwargs):
+        flush = kwargs.pop('flush', False)
+        old_print(*args, **kwargs)
+        if flush:
+            file = kwargs.get('file', sys.stdout)
+            file.flush() if file is not None else sys.stdout.flush()
+else:
+    print = print
 
 
 # Makes a argparse parser from a class of parameter names / default values

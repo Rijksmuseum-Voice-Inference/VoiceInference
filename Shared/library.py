@@ -3,9 +3,13 @@ from torch.nn import *
 import torch.nn.functional as F
 
 
+def make_list(*elems):
+    return elems
+
+
 class MultConst(Module):
     def __init__(self, multiplier):
-        super().__init__()
+        super(MultConst, self).__init__()
         self.multiplier = multiplier
 
     def forward(self, features):
@@ -14,7 +18,7 @@ class MultConst(Module):
 
 class AddConst(Module):
     def __init__(self, addend):
-        super().__init__()
+        super(AddConst, self).__init__()
         self.addend = addend
 
     def forward(self, features):
@@ -23,7 +27,7 @@ class AddConst(Module):
 
 class LearnableBias(Module):
     def __init__(self):
-        super().__init__()
+        super(LearnableBias, self).__init__()
         self.bias = Parameter(torch.zeros(1))
 
     def forward(self, features):
@@ -32,7 +36,7 @@ class LearnableBias(Module):
 
 class Dropout1d(Module):
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        super(Dropout1d, self).__init__()
         self.dropout2d = Dropout2d(*args, **kwargs)
 
     def forward(self, features):
@@ -42,17 +46,17 @@ class Dropout1d(Module):
 
 class Reshape(Module):
     def __init__(self, *target_size):
-        super().__init__()
+        super(Reshape, self).__init__()
         self.target_size = target_size
 
     def forward(self, features):
         batch_size = features.size()[0]
-        return features.reshape([batch_size, *self.target_size])
+        return features.reshape(make_list(batch_size, *self.target_size))
 
 
 class Resize(Module):
     def __init__(self, *target_size):
-        super().__init__()
+        super(Resize, self).__init__()
         self.target_size = target_size
 
     def forward(self, features):
@@ -61,7 +65,7 @@ class Resize(Module):
 
 class RevertSize(Module):
     def __init__(self, sizes_list, value=0, transform={}):
-        super().__init__()
+        super(RevertSize, self).__init__()
         self.sizes_list = sizes_list
         self.value = value
         self.transform = transform
@@ -90,7 +94,7 @@ class RevertSize(Module):
 
 class Slice(Module):
     def __init__(self, size, dim):
-        super().__init__()
+        super(Slice, self).__init__()
         self.size = size
         self.dim = dim
 
@@ -100,7 +104,7 @@ class Slice(Module):
 
 class Transpose(Module):
     def __init__(self, dim_0, dim_1):
-        super().__init__()
+        super(Transpose, self).__init__()
         self.dim_0 = dim_0
         self.dim_1 = dim_1
 
@@ -110,7 +114,7 @@ class Transpose(Module):
 
 class TupleSelector(Module):
     def __init__(self, module, index):
-        super().__init__()
+        super(TupleSelector, self).__init__()
         self.module = module
         self.index = index
 
@@ -120,7 +124,7 @@ class TupleSelector(Module):
 
 class PadToMinimum(Module):
     def __init__(self, minimum_size, dim):
-        super().__init__()
+        super(PadToMinimum, self).__init__()
         self.minimum_size = minimum_size
         self.dim = dim
 
@@ -145,7 +149,7 @@ class GlobalAvgPool(Module):
 
 class UndoGlobalAvgPool(Module):
     def __init__(self, sizes_list):
-        super().__init__()
+        super(UndoGlobalAvgPool, self).__init__()
         self.sizes_list = sizes_list
 
     def forward(self, features):
@@ -159,7 +163,7 @@ class UndoGlobalAvgPool(Module):
 
 class PartialAvgPool(Module):
     def __init__(self, *num_average):
-        super().__init__()
+        super(PartialAvgPool, self).__init__()
         self.num_average = num_average
         self.total_count = sum(self.num_average)
         self.avg_pool = GlobalAvgPool()
@@ -173,7 +177,7 @@ class PartialAvgPool(Module):
             results.append(self.avg_pool(features[:, pos:(pos + count)]))
             pos += count
 
-        return (features[:, :-self.total_count], *results)
+        return make_list(features[:, :-self.total_count], *results)
 
 
 class PrintSize(Module):
@@ -184,7 +188,7 @@ class PrintSize(Module):
 
 class AppendSize(Module):
     def __init__(self, output_list):
-        super().__init__()
+        super(AppendSize, self).__init__()
         self.output_list = output_list
 
     def forward(self, features):

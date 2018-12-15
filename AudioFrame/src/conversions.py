@@ -20,7 +20,7 @@ def display_frames(frames):
     plt.savefig('temp.png', dpi=800)
 
 
-class AudioFrameConvOptions:
+class AudioFrameConvOptions(object):
     def __init__(self):
         self.window_length = 0.025
         self.interval_length = 0.005
@@ -35,8 +35,8 @@ default_options = AudioFrameConvOptions()
 
 def encode(sample_rate, samples, options=default_options):
     length = samples.shape[0]
-    window = round(sample_rate * options.window_length)
-    interval = round(sample_rate * options.interval_length)
+    window = int(round(sample_rate * options.window_length))
+    interval = int(round(sample_rate * options.interval_length))
 
     expanded_length = expand_to_fit(length, window, interval)
     samples = np.pad(samples, (0, expanded_length - length), 'constant')
@@ -51,8 +51,8 @@ def encode(sample_rate, samples, options=default_options):
 
 def decode(sample_rate, frames, num_iters,
            options=default_options, phase_data=None):
-    window = round(sample_rate * options.window_length)
-    interval = round(sample_rate * options.interval_length)
+    window = int(round(sample_rate * options.window_length))
+    interval = int(round(sample_rate * options.interval_length))
 
     if phase_data is None:
         phase_data = np.random.uniform(

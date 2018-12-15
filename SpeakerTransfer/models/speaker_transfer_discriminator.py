@@ -4,7 +4,7 @@ from library import *
 
 class SpeakerTransferDiscriminator(Module):
     def __init__(self):
-        super().__init__()
+        super(SpeakerTransferDiscriminator, self).__init__()
 
         self.layers = Sequential(
             PadToMinimum(45, 2),

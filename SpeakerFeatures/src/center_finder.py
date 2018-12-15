@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+
+from __future__ import print_function
+from util import print
+
 import os
 import pickle
 import numpy as np

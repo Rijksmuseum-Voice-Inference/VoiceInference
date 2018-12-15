@@ -49,36 +49,28 @@ class VCTKLoader:
         self.utterance_take_count = utterance_take_count
 
     def __iter__(self):
-        speech = np.zeros((0, 0))
-        indices = np.zeros(0)
-        speakers = np.zeros(0)
-        order = np.zeros(0)
+        nonlocal_vars = {}
+        nonlocal_vars['speech'] = np.zeros((0, 0))
+        nonlocal_vars['indices'] = np.zeros(0)
+        nonlocal_vars['speakers'] = np.zeros(0)
+        nonlocal_vars['order'] = np.zeros(0)
 
-        speech_next = None
-        indices_next = None
-        speakers_next = None
-        order_next = None
+        nonlocal_vars['speech_next'] = None
+        nonlocal_vars['indices_next'] = None
+        nonlocal_vars['speakers_next'] = None
+        nonlocal_vars['order_next'] = None
 
         def iterate():
-            nonlocal speech
-            nonlocal indices
-            nonlocal speakers
-            nonlocal order
+            for utterance in nonlocal_vars['order']:
+                start_index = nonlocal_vars['indices'][utterance]
+                end_index = nonlocal_vars['indices'][utterance + 1]
 
-            for utterance in order:
-                start_index = indices[utterance]
-                end_index = indices[utterance + 1]
+                result = self.feature_extractor(
+                    nonlocal_vars['speech'][start_index:end_index])
 
-                result = self.feature_extractor(speech[start_index:end_index])
-
-                yield (result, speakers[utterance])
+                yield (result, nonlocal_vars['speakers'][utterance])
 
         def load_data():
-            nonlocal speech_next
-            nonlocal indices_next
-            nonlocal speakers_next
-            nonlocal order_next
-
             speech_list = []
             sizes_list = [np.zeros(1, dtype=np.int64)]
             speaker_list = []
@@ -111,28 +103,32 @@ class VCTKLoader:
                 speaker_list.append(np.zeros(
                     sizes.shape[0], dtype=np.int64) + speaker)
 
-            speech_next = np.concatenate(speech_list, axis=0)
-            indices_next = np.cumsum(np.concatenate(sizes_list), axis=0)
-            speakers_next = np.concatenate(speaker_list)
+            nonlocal_vars['speech_next'] = \
+                np.concatenate(speech_list, axis=0)
+            nonlocal_vars['indices_next'] = \
+                np.cumsum(np.concatenate(sizes_list), axis=0)
+            nonlocal_vars['speakers_next'] = \
+                np.concatenate(speaker_list)
             del(speech_list)
 
-            num_utterances = indices_next.shape[0] - 1
-            order_next = np.random.permutation(num_utterances)
+            num_utterances = nonlocal_vars['indices_next'].shape[0] - 1
+            nonlocal_vars['order_next'] = np.random.permutation(num_utterances)
 
         while True:
             thread = threading.Thread(target=load_data)
             thread.start()
 
-            yield from iterate()
+            for data in iterate():
+                yield data
 
-            speech = None
-            indices = None
-            speakers = None
-            order = None
+            nonlocal_vars['speech'] = None
+            nonlocal_vars['indices'] = None
+            nonlocal_vars['speakers'] = None
+            nonlocal_vars['order'] = None
 
             thread.join()
 
-            speech = speech_next
-            indices = indices_next
-            speakers = speakers_next
-            order = order_next
+            nonlocal_vars['speech'] = nonlocal_vars['speech_next']
+            nonlocal_vars['indices'] = nonlocal_vars['indices_next']
+            nonlocal_vars['speakers'] = nonlocal_vars['speakers_next']
+            nonlocal_vars['order'] = nonlocal_vars['order_next']

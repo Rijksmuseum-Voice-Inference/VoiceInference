@@ -4,7 +4,7 @@ from library import *
 
 class SpeakerTransferReconstructor(Module):
     def __init__(self):
-        super().__init__()
+        super(SpeakerTransferReconstructor, self).__init__()
         self.sizes = []
         self.layers = Sequential(
             ConvTranspose1d(1024, 1536, 3),
@@ -31,7 +31,7 @@ class SpeakerTransferReconstructor(Module):
 
     def forward(self, features, metadata):
         (sizes,) = metadata
-        self.sizes.clear()
+        self.sizes *= 0
         self.sizes += sizes
         return self.layers(features)
 

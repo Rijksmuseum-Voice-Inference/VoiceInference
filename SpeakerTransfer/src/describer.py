@@ -3,7 +3,7 @@ import torch
 
 class Describer(torch.nn.Module):
     def __init__(self, net, num_categ):
-        super().__init__()
+        super(Describer, self).__init__()
         self.net = net
         self.num_categ = num_categ
         self.forward = self.describe

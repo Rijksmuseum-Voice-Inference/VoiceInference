@@ -81,13 +81,13 @@ for speaker in range(SPEAKER_START_INDEX, NUM_SPEAKERS):
     np.save(path, sizes)
 
 with open(os.path.join(DEST_DATA_PATH, "conv_options.pkl"), 'wb') as f:
-    pickle.dump(conv_options, f)
+    pickle.dump(conv_options, f, protocol=2)
 
 with open(os.path.join(SOURCE_DATA_PATH, "metadata.pkl"), 'rb') as f:
     metadata = pickle.load(f)
 
 with open(os.path.join(DEST_DATA_PATH, "metadata.pkl"), 'wb') as f:
-    pickle.dump(metadata, f)
+    pickle.dump(metadata, f, protocol=2)
 
 band_mags = np.load(os.path.join(SOURCE_DATA_PATH, "band_mags.npy"))
 np.save(os.path.join(DEST_DATA_PATH, "band_mags.npy"), band_mags)

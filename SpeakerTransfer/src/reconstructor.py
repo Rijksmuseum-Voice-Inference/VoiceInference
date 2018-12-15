@@ -3,7 +3,7 @@ import torch
 
 class Reconstructor(torch.nn.Module):
     def __init__(self, net, exp_frac=None):
-        super().__init__()
+        super(Reconstructor, self).__init__()
         self.net = net
         self.forward = self.reconst
         self.exp_frac = exp_frac

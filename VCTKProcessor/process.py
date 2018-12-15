@@ -14,7 +14,7 @@ conv_options = conversions.AudioFrameConvOptions()
 sample_rate = 48000
 
 with open('data/conv_options.pkl', 'wb') as f:
-    pickle.dump(conv_options, f)
+    pickle.dump(conv_options, f, protocol=2)
 
 file_id = 0
 metadata = []
@@ -55,4 +55,4 @@ pool.close()
 pool.join()
 
 with open('data/metadata.pkl', 'wb') as f:
-    pickle.dump(metadata, f)
+    pickle.dump(metadata, f, protocol=2)

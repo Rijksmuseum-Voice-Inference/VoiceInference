@@ -3,7 +3,7 @@ import torch
 
 class LatentForger(torch.nn.Module):
     def __init__(self, net):
-        super().__init__()
+        super(LatentForger, self).__init__()
         self.net = net
         self.forward = self.modify_latent
 

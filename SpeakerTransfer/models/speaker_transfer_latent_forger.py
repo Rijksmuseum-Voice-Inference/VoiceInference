@@ -5,7 +5,7 @@ from library import *
 
 class LatentForgerModel(Module):
     def __init__(self):
-        super().__init__()
+        super(LatentForgerModel, self).__init__()
 
         self.layers = Sequential(
             Conv1d(1024 + 2 * 128, 1536, 3, padding=1),

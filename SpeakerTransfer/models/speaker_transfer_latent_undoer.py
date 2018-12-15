@@ -5,7 +5,7 @@ from library import *
 
 class LatentUndoerModel(Module):
     def __init__(self):
-        super().__init__()
+        super(LatentUndoerModel, self).__init__()
 
         self.layers = Sequential(
             Conv1d(1024 + 128, 1024, 1),
