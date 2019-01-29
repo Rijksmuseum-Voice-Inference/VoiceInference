@@ -18,8 +18,7 @@ class LatentForgerModel(Module):
             Transpose(1, 2),
             Conv1d(1024, 1024, 1),
             LeakyReLU(negative_slope=0.1),
-            Conv1d(1024, 1024 + 1 + 128, 1),
-            PartialAvgPool(1, 128)
+            Conv1d(1024, 1024, 1),
         )
 
     def forward(self, orig_latent, orig_categ, forgery_categ):

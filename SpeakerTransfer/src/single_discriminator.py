@@ -1,15 +1,15 @@
 import torch
 
 
-class Discriminator(torch.nn.Module):
+class SingleDiscriminator(torch.nn.Module):
     def __init__(self, net):
-        super(Discriminator, self).__init__()
+        super(SingleDiscriminator, self).__init__()
         self.net = net
         self.forward = self.discriminate
         self.bce = torch.nn.BCEWithLogitsLoss()
 
-    def discriminate(self, features, categ):
-        return self.net(features, categ)
+    def discriminate(self, features):
+        return self.net(features)
 
     def gen_loss(self, fake_decision):
         ones = fake_decision.new_ones(fake_decision.size())
