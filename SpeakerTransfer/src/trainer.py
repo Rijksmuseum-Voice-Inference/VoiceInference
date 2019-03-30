@@ -3,16 +3,18 @@
 from __future__ import print_function
 from util import print
 
-import IPython
 import random
 import numpy as np
 import torch
 import util
+import IPython
+
+import conversions
+from loader import from_torch, to_torch
 
 from describer import Describer
 from reconstructor import Reconstructor
 from latent_forger import LatentForger
-from single_discriminator import SingleDiscriminator
 from pair_discriminator import PairDiscriminator
 from loader import VCTKLoader
 
@@ -31,19 +33,22 @@ if torch.cuda.is_available():
     except RuntimeError:
         pass
 
+conversions
+from_torch
+to_torch
+
 
 class Parameters:
     def __init__(self):
         self.data_path = "../VCTKProcessor/data/"
         self.speaker_categs_path = "../SpeakerFeatures/data/centers.pth"
-        self.band_mags_path = "../VCTKProcessor/data/band_mags.npy"
         self.stage = ""
         self.header = "speaker_transfer"
         self.lr = 0.0001
         self.advers_lr = 0.00005
         self.categ_term = 0.10
         self.robustness_term = 0.20
-        self.exp_frac = 0.5
+        self.log_frac = 0.25
         self.advers_term = 0.05
         self.activity_term = 0.05
         self.undone_term = 0.05
@@ -51,6 +56,7 @@ class Parameters:
         self.num_periods = 0
         self.period_size = 10000
         self.rand_seed = -1
+        self.sample_rate = 16000
 
 
 parser = util.make_parser(Parameters(), "Latent Forger Model")
@@ -63,14 +69,14 @@ def train_analysts(params):
     describer_model = util.load_model(params.header + DESCRIBER_FOOTER)
     describer = Describer(describer_model, speaker_feature_dim)
     util.initialize(describer)
-    describer.train()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
+    reconstructor = Reconstructor(reconstructor_model, params.log_frac)
     util.initialize(reconstructor)
 
-    discriminator_model = util.load_model(params.header + DISCRIMINATOR_FOOTER)
-    discriminator = SingleDiscriminator(discriminator_model)
+    examiner_model = util.load_model(params.header + EXAMINER_FOOTER)
+    distinguisher_model = util.load_model(params.header + DISTINGUISHER_FOOTER)
+    discriminator = PairDiscriminator(examiner_model, distinguisher_model)
     util.initialize(discriminator)
     discriminator.train()
 
@@ -121,15 +127,20 @@ def train_analysts(params):
             (latent, metadata, pred_categ) = describer.describe(orig)
             reconst = reconstructor.reconst(latent, metadata)
 
-            real_decision = discriminator.discriminate(orig, orig_categ)
-            fake_decision = discriminator.discriminate(reconst, orig_categ)
+            truth = 0 if (np.random.random() < 0.5) else 1
+
+            if truth == 0:
+                decision = discriminator.discriminate(
+                    orig_categ, orig, reconst)
+            else:
+                decision = discriminator.discriminate(
+                    orig_categ, reconst, orig)
 
             categ_loss = describer.categ_loss(pred_categ, orig_categ)
             robustness_loss = describer.categ_loss(pred_categ, center_categ)
             reconst_loss = reconstructor.reconst_loss(reconst, orig)
-            gen_loss = discriminator.gen_loss(fake_decision)
-            advers_loss = discriminator.advers_loss(
-                real_decision, fake_decision)
+            gen_loss = discriminator.gen_loss(decision, truth)
+            advers_loss = discriminator.advers_loss(decision, truth)
 
             loss = (
                 params.categ_term * categ_loss +
@@ -150,9 +161,10 @@ def train_analysts(params):
 
             if num_in_batch >= params.batch_size:
                 mean_discrim_loss = discrim_loss_sum_batch / num_in_batch
-                advers_optim.zero_grad()
-                mean_discrim_loss.backward(retain_graph=True)
-                advers_optim.step()
+                if gen_loss_batch / num_in_batch <= 10.0:
+                    advers_optim.zero_grad()
+                    mean_discrim_loss.backward(retain_graph=True)
+                    advers_optim.step()
 
                 mean_loss = loss_sum_batch / num_in_batch
                 optim.zero_grad()
@@ -203,14 +215,13 @@ def pretrain_manipulators(params):
     num_speakers, speaker_feature_dim = speaker_categs.size()
 
     describer_model = util.load_model(params.header + DESCRIBER_FOOTER)
-    describer = Describer(
-        describer_model, speaker_feature_dim)
+    describer = Describer(describer_model, speaker_feature_dim)
     describer.load_state_dict(torch.load(
         'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth'))
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
+    reconstructor = Reconstructor(reconstructor_model, params.log_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
 
@@ -256,6 +267,7 @@ def pretrain_manipulators(params):
             pretend_latent = latent_forger.modify_latent(
                 orig_latent, forgery_categ, orig_categ)
             pretend_reconst = reconstructor.reconst(pretend_latent, metadata)
+
             latent_loss = latent_forger.pretrain_loss(
                 pretend_latent, orig_latent)
             reconst_loss = reconstructor.reconst_loss(pretend_reconst, orig)
@@ -305,14 +317,13 @@ def train_manipulators(params):
     num_speakers, speaker_feature_dim = speaker_categs.size()
 
     describer_model = util.load_model(params.header + DESCRIBER_FOOTER)
-    describer = Describer(
-        describer_model, speaker_feature_dim)
+    describer = Describer(describer_model, speaker_feature_dim)
     describer.load_state_dict(torch.load(
         'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth'))
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
+    reconstructor = Reconstructor(reconstructor_model, params.log_frac)
     reconstructor.load_state_dict(torch.load(
         'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth'))
 
@@ -379,11 +390,11 @@ def train_manipulators(params):
 
             orig_latent, metadata = describer.latent(orig)
             orig_latent = orig_latent.detach()
-            orig_reconst = reconstructor.reconst(orig_latent, metadata)
-            orig_reconst = orig_reconst.detach()
+
             forgery_latent_raw = latent_forger.modify_latent(
                 orig_latent, orig_categ, target_categ)
             forgery = reconstructor.reconst(forgery_latent_raw, metadata)
+
             (forgery_latent, metadata, pred_forgery_categ) = \
                 describer.describe(forgery)
 
@@ -434,14 +445,16 @@ def train_manipulators(params):
 
             if num_in_batch >= params.batch_size:
                 mean_discrim_loss = discrim_loss_sum_batch / num_in_batch
-                advers_optim.zero_grad()
-                mean_discrim_loss.backward(retain_graph=True)
-                advers_optim.step()
+                if gen_loss_batch / num_in_batch <= 10.0:
+                    advers_optim.zero_grad()
+                    mean_discrim_loss.backward(retain_graph=True)
+                    advers_optim.step()
 
                 mean_loss = loss_sum_batch / num_in_batch
                 optim.zero_grad()
                 mean_loss.backward()
-                optim.step()
+                if period >= 1:
+                    optim.step()
 
                 print("(" + "|".join([
                     "%0.3f" % (forgery_categ_loss_sum_batch / num_in_batch),
@@ -490,24 +503,20 @@ def playground(params):
     describer.eval()
 
     reconstructor_model = util.load_model(params.header + RECONSTRUCTOR_FOOTER)
-    reconstructor = Reconstructor(reconstructor_model, params.exp_frac)
+    reconstructor = Reconstructor(reconstructor_model, params.log_frac)
 
     latent_forger_model = util.load_model(params.header + LATENT_FORGER_FOOTER)
     latent_forger = LatentForger(latent_forger_model)
 
-    try:
-        describer.load_state_dict(torch.load(
-            'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth',
-            map_location=lambda storage, loc: storage))
-        reconstructor.load_state_dict(torch.load(
-            'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth',
-            map_location=lambda storage, loc: storage))
-        latent_forger.load_state_dict(torch.load(
-            'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth',
-            map_location=lambda storage, loc: storage))
-    except Exception:
-        print("Couldn't load all snapshots!")
-        pass
+    describer.load_state_dict(torch.load(
+        'snapshots/' + params.header + DESCRIBER_FOOTER + '.pth',
+        map_location=lambda storage, loc: storage))
+    reconstructor.load_state_dict(torch.load(
+        'snapshots/' + params.header + RECONSTRUCTOR_FOOTER + '.pth',
+        map_location=lambda storage, loc: storage))
+    latent_forger.load_state_dict(torch.load(
+        'snapshots/' + params.header + LATENT_FORGER_FOOTER + '.pth',
+        map_location=lambda storage, loc: storage))
 
     IPython.embed()
 

@@ -50,7 +50,7 @@ def encode(sample_rate, samples, options=default_options):
 
 
 def decode(sample_rate, frames, num_iters,
-           options=default_options, phase_data=None):
+           options=default_options, phase_data=None, fix='magnitude'):
     window = int(round(sample_rate * options.window_length))
     interval = int(round(sample_rate * options.interval_length))
 
@@ -59,8 +59,7 @@ def decode(sample_rate, frames, num_iters,
             -np.pi / 2, np.pi / 2, size=frames.shape)
         phase_data = np.cumsum(phase_data, axis=0)
         phase_data = phase_data + np.random.uniform(
-            -np.pi, np.pi,
-            size=(1, frames.shape[1]))
+            -np.pi, np.pi, size=(1, frames.shape[1]))
 
     frames_iter = frames * np.exp(1.0j * phase_data)
 
@@ -69,17 +68,39 @@ def decode(sample_rate, frames, num_iters,
             frames_iter, window, interval, options.fft_size)
         frames_iter = fourier_time_series(
             buckets, window, interval, options.fft_size)
-        frames_iter = frames * np.exp(1.0j * np.angle(frames_iter))
+        if fix == 'magnitude':
+            frames_iter = frames * np.exp(1.0j * np.angle(frames_iter))
+        elif fix == 'phase':
+            frames_iter = np.abs(frames_iter) * np.exp(1.0j * phase_data)
+        else:
+            raise Exception("Invalid option: " + fix)
 
     return inv_fourier_time_series(
         frames_iter, window, interval, options.fft_size)
 
 
-def to_log(mag_frames, options=default_options):
+def shift_ensemble(samples, count, jump, process_fn):
+    length = samples.shape[0]
+    acc = None
+
+    for i in range(count):
+        shifted = np.concatenate(
+            [np.zeros(i), samples[:length - i]], axis=0)
+        result = np.concatenate(
+            [process_fn(shifted)[i:], np.zeros(i)], axis=0)
+        if acc is None:
+            acc = result
+        else:
+            acc += result
+
+    return acc / count
+
+
+def to_log(mag_frames, options=default_options, log_fn=np.log):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
-    return (np.log(1.0 + mag_frames / noise_thres_f) +
+    return (log_fn(1.0 + mag_frames / noise_thres_f) +
             np.log(noise_thres_f) - np.log(typical_sig_f))
 
 
@@ -102,14 +123,19 @@ def to_two(mag_frames, band_mags, options=default_options):
          to_mag_norm(mag_frames, band_mags)], axis=1)
 
 
-def from_log(log_frames, options=default_options):
+def np_make_pos_fn(val):
+    return np.maximum(val, 0.0)
+
+
+def from_log(log_frames, options=default_options,
+             make_pos_fn=np_make_pos_fn, exp_fn=np.exp):
     noise_thres_f = np.sqrt((options.noise_thres ** 2) / options.fft_size)
     typical_sig_f = np.sqrt((options.typical_sig ** 2) / options.fft_size)
 
-    log_frames_pos = np.maximum(
-        log_frames + np.log(typical_sig_f) - np.log(noise_thres_f), 0.0)
+    log_frames_pos = make_pos_fn(
+        log_frames + np.log(typical_sig_f) - np.log(noise_thres_f))
 
-    return (np.exp(log_frames_pos) - 1.0) * noise_thres_f
+    return (exp_fn(log_frames_pos) - 1.0) * noise_thres_f
 
 
 def from_mag_norm(norm_frames, band_mags, options=default_options):
@@ -188,14 +214,10 @@ def inv_fourier_time_series(fourier_time_slices, window, interval, fft_size):
         time_slices[i] = np.fft.irfft(
             fourier_time_slices[i], fft_size)[:window]
 
-    time_slices = time_slices / get_window_fn(window)
+    window_fn = get_window_fn(window)
+    time_slices = time_slices / window_fn
 
-    window_weight_profile = np.concatenate([
-        np.linspace(0, 1, interval),
-        np.ones(window - 2 * interval),
-        np.linspace(1, 0, interval)])
-    window_weight_profile[0] = EPSILON
-    window_weight_profile[-1] = EPSILON
+    window_weight_profile = window_fn[0]
 
     for (i, window_index) in enumerate(window_indices):
         window_weights[window_index] += window_weight_profile
